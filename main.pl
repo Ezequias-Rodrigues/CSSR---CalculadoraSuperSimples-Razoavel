@@ -122,6 +122,18 @@ evaluate(==(Left, Right), Assign, false) :-
 evaluate(==(Left, Right), Assign, false) :-
     (evaluate(Left, Assign, false) , evaluate(Right, Assign, true)).
 
+evaluate(<>(Left, Right), Assign, true) :-
+    (evaluate(Left, Assign, true), evaluate(Right, Assign, true)).
+
+evaluate(<>(Left, Right), Assign, true) :-
+    (evaluate(Left, Assign, false), evaluate(Right, Assign, false)).
+
+evaluate(<>(Left, Right), Assign, false) :-
+    (evaluate(Left, Assign, true) , evaluate(Right, Assign, false)).
+
+evaluate(<>(Left, Right), Assign, false) :-
+    (evaluate(Left, Assign, false) , evaluate(Right, Assign, true)).
+
 %xor
 evaluate(^(Left, Right), Assign, false) :-
     (evaluate(Left, Assign, true), evaluate(Right, Assign, true)).
