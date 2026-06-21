@@ -26,23 +26,23 @@ Uma calculadora de lógica proposicional desenvolvida em Prolog que permite:
 ### Exemplos
 
 ```prolog
-p and q
+p and q.
 ```
 
 ```prolog
-not p or q
+not p or q.
 ```
 
 ```prolog
-(p and q) implies r
+(p and q) implies r.
 ```
 
 ```prolog
-(p xor q) and not r
+(p xor q) and not r.
 ```
 
 ```prolog
-(p xnor q) or (r nand s)
+(p xnor q) or (r nand s).
 ```
 
 ## Como executar
@@ -59,7 +59,8 @@ Em seguida execute:
 start.
 ```
 
-Nota: o terminal buga inconsistentemente(letra sobre letra, cursor voltando pro começo etc) ao digitar, porém o código funciona do mesmo jeito.
+Nota: O terminal buga inconsistentemente(letra sobre letra, cursor voltando pro começo etc) ao digitar, porém o código funciona do mesmo jeito.
+Nota2: É necessário o uso de "." no final de cada expressão.
 ## Saída
 
 Para cada expressão o programa:
@@ -87,7 +88,7 @@ Para cada expressão o programa:
 Entrada:
 
 ```prolog
-(a and b) or (a and not b)
+(a and b) or (a and not b).
 ```
 
 Saída simplificada:
