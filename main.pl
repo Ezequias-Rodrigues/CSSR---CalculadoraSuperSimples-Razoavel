@@ -1,5 +1,5 @@
 %Vo definir varios operadores para permitir qualquer formato
-%Correção, eu IA definir varios, mas tem que repetir muito codigo, então vou dar uma resumida
+%Correção, eu ia definir varios, mas tem que repetir muito codigo, então vou dar uma resumida
 %negacoes
 :- op(1, fy, not). 
 :- op(2, yfx, xor).
@@ -26,6 +26,7 @@ start :-
     write('! A simplificação heuristica foca em deixar a expressão mais curta, então xor e xnor são a forma final.'), nl, 
     write('    E por esse mesmo motivo, a distributiva só faz fatoração.'),nl,
     write('! A simplificação tabular foca em pegar a menor expressão em que os termos não se repitam, usando somente negação, conjunção e disjunção, e por isso acredito que é mais completa.'),
+    nl,write('!Limitação: Não use variaveis em capslock. Descobri do pior jeito(1 hora tentando descobrir onde tava causando loop infinto e não achando as variaveis)'),
     get_expr.
 get_expr :-
     nl,
@@ -230,6 +231,8 @@ format_formula([X|Rest], Result):- format_term(X, TermX), format_formula(Rest, R
 format_term(Var, Var) :- atom(Var).
 format_term(not(Var), Result):-atomic_list_concat(['not ', Var], Result).
 %AND/E
+evaluate(true, _, true).
+evaluate(false, _, false).
 evaluate(and(A, B), E, Val) :-
     evaluate(A, E, ValA), evaluate(B, E, ValB),
     ( (ValA == true, ValB == true) -> Val = true ; Val = false ).
@@ -261,10 +264,9 @@ evaluate(nor(A, B), E, Val) :-
 evaluate(not(Expr), E, Val) :-
     evaluate(Expr, E, ValExpr),
     ( ValExpr == true -> Val = false ; Val = true ).
-evaluate(true, _, true).
-evaluate(false, _, false).
 %Variavel sozinha, basicamente a? então a = a. Papo de doido, tlg
 evaluate(Var, E, Value) :-
+    atom(Var),
     member(Var=Value, E).
 %Fim da logica dos operadores
 generate_combinations([], [[]]).
@@ -275,21 +277,21 @@ add_values(_, [], []).
 add_values(Var, [Combo|Rest], [[Var=true|Combo], [Var=false|Combo]|More]) :-
     add_values(Var, Rest, More).
 %Daq pra baixo é só pra fazer o codigo "ler", isso é tipo o tokenizador, so q feito por alienigenas
-find_vars(Term, Vars) :- %Essas 6 linhas substituiram + de 40... bizarro
+find_vars(Term, Vars) :-
     compound(Term),
-    Term =.. [_|Args],
-    maplist(find_vars, Args, VarsList),
-    append(VarsList, VarsFlat),
-    sort(VarsFlat, Vars).
-find_vars(not(X), Vars) :- find_vars(X, Vars).
-find_vars(X, [X]) :- atom(X), X \= true, X \= false.
+    ( Term = not(X) ->
+        find_vars(X, Vars)
+    ;
+        Term =.. [_|Args],
+        maplist(find_vars, Args, VarsList),
+        append(VarsList, VarsFlat),
+        sort(VarsFlat, Vars)
+    ).
+find_vars(X, [X]) :-
+    ( atom(X) ; var(X) ),
+    X \= true,
+    X \= false.
 find_vars(_, []).
-find_vars(true, []).
-find_vars(false, []).
-find_vars(Var, [Var]):- %mANO prolog é mto estranho
-    atom(Var), %Hmmm sim, essa variavel é uma variavel
-    Var \= true,
-    Var \= false.
 size(true, 1).
 size(false, 1).
 size(Var, 1) :- atom(Var).
@@ -334,79 +336,135 @@ simplify((A and (A or _)), E):- simplify(A, E).
 simplify((A and (_ or A)), E):- simplify(A, E). 
 simplify(((A or _) and A), E):- simplify(A, E). 
 simplify(((_ or A) and A), E):- simplify(A, E). 
+
 simplify((A or (not(A) and B)), or(SA, SB)) :-  %REGRA DESTRUTIVA, JÁ PATENTEEI
-    simplify(A, SA), simplify(B, SB).
-simplify(((not(A) and B) or A), or(SA, SB)) :- 
-    simplify(A, SA), simplify(B, SB).
-simplify((A or (B and not(A))), or(SA, SB)) :- 
-    simplify(A, SA), simplify(B, SB).
-simplify(((B and not(A)) or A), or(SA, SB)) :- 
-    simplify(A, SA), simplify(B, SB).
-simplify((A and (not(A) or B)), and(SA, SB)) :-  
-    simplify(A, SA), simplify(B, SB).
-simplify(((not(A) or B) and A), and(SA, SB)) :- 
-    simplify(A, SA), simplify(B, SB).
-simplify((A and (B or not(A))), and(SA, SB)) :- 
-    simplify(A, SA), simplify(B, SB).
-simplify(((B or not(A)) and A), and(SA, SB)) :- 
-    simplify(A, SA), simplify(B, SB).
+    simplify(A, SA),
+    simplify(B, SB),
+    size((A or (not(A) and B)), S1),
+    size(or(SA, SB), S2),
+    S2 < S1.
+
+simplify(((not(A) and B) or A), or(SA, SB)) :-
+    simplify(A, SA),
+    simplify(B, SB),
+    size(((not(A) and B) or A), S1),
+    size(or(SA, SB), S2),
+    S2 < S1.
+
+simplify((A or (B and not(A))), or(SA, SB)) :-
+    simplify(A, SA),
+    simplify(B, SB),
+    size((A or (B and not(A))), S1),
+    size(or(SA, SB), S2),
+    S2 < S1.
+
+simplify(((B and not(A)) or A), or(SA, SB)) :-
+    simplify(A, SA),
+    simplify(B, SB),
+    size(((B and not(A)) or A), S1),
+    size(or(SA, SB), S2),
+    S2 < S1.
+
+simplify((A and (not(A) or B)), and(SA, SB)) :-
+    simplify(A, SA),
+    simplify(B, SB),
+    size((A and (not(A) or B)), S1),
+    size(and(SA, SB), S2),
+    S2 < S1.
+
+simplify(((not(A) or B) and A), and(SA, SB)) :-
+    simplify(A, SA),
+    simplify(B, SB),
+    size(((not(A) or B) and A), S1),
+    size(and(SA, SB), S2),
+    S2 < S1.
+
+simplify((A and (B or not(A))), and(SA, SB)) :-
+    simplify(A, SA),
+    simplify(B, SB),
+    size((A and (B or not(A))), S1),
+    size(and(SA, SB), S2),
+    S2 < S1.
+
+simplify(((B or not(A)) and A), and(SA, SB)) :-
+    simplify(A, SA),
+    simplify(B, SB),
+    size(((B or not(A)) and A), S1),
+    size(and(SA, SB), S2),
+    S2 < S1.
 % -- A seção a seguir é... peculiar
 simplify(((A and B) or (A and C)), (SA and (SB or SC))) :- 
     simplify(A, SA), 
     simplify(B, SB), 
     simplify(C, SC),
+    (SA \== A ; SB \== B ; SC \== C),
     size(((A and B) or (A and C)), S1),
     size((SA and (SB or SC)), S2),
-    S2 < S1.
+    S2 < S1,
+    !.
 simplify(((B and A) or (A and C)), (SA and (SB or SC))) :- 
     simplify(A, SA), 
     simplify(B, SB), 
     simplify(C, SC),
+    (SA \== A ; SB \== B ; SC \== C),
     size(((B and A) or (A and C)), S1),
     size((SA and (SB or SC)), S2),
-    S2 < S1.
+    S2 < S1,
+    !.
 simplify(((A and B) or (C and A)), (SA and (SB or SC))) :- 
     simplify(A, SA), 
     simplify(B, SB), 
     simplify(C, SC),
+    (SA \== A ; SB \== B ; SC \== C),
     size(((A and B) or (C and A)), S1),
     size((SA and (SB or SC)), S2),
-    S2 < S1.
+    S2 < S1,
+    !.
 simplify(((B and A) or (C and A)), (SA and (SB or SC))) :- 
     simplify(A, SA), 
     simplify(B, SB), 
     simplify(C, SC),
+    (SA \== A ; SB \== B ; SC \== C),
     size(((B and A) or (C and A)), S1),
     size((SA and (SB or SC)), S2),
-    S2 < S1.
+    S2 < S1,
+    !.
 simplify(((A or B) and (A or C)), (SA or (SB and SC))) :- 
     simplify(A, SA), 
     simplify(B, SB), 
     simplify(C, SC),
+    (SA \== A ; SB \== B ; SC \== C),
     size(((A or B) and (A or C)), S1),
     size((SA or (SB and SC)), S2),
-    S2 < S1.
+    S2 < S1,
+    !.
 simplify(((B or A) and (A or C)), (SA or (SB and SC))) :- 
     simplify(A, SA), 
     simplify(B, SB), 
     simplify(C, SC),
+    (SA \== A ; SB \== B ; SC \== C),
     size(((B or A) and (A or C)), S1),
     size((SA or (SB and SC)), S2),
-    S2 < S1.
+    S2 < S1,
+    !.
 simplify(((A or B) and (C or A)), (SA or (SB and SC))) :- 
     simplify(A, SA), 
     simplify(B, SB), 
     simplify(C, SC),
+    (SA \== A ; SB \== B ; SC \== C),
     size(((A or B) and (C or A)), S1),
     size((SA or (SB and SC)), S2),
-    S2 < S1.
+    S2 < S1,
+    !.
 simplify(((B or A) and (C or A)), (SA or (SB and SC))) :- 
     simplify(A, SA), 
     simplify(B, SB), 
     simplify(C, SC),
+    (SA \== A ; SB \== B ; SC \== C),
     size(((B or A) and (C or A)), S1),
     size((SA or (SB and SC)), S2),
-    S2 < S1.
+    S2 < S1,
+    !.
 simplify((A and (A or _)), E) :- simplify(A, E).
 simplify(((A or _) and A), E) :- simplify(A, E).
 simplify((A and (_ or A)), E) :- simplify(A, E).
@@ -438,22 +496,22 @@ simplify((not(A) or not(B)), nand(SA,SB)) :- simplify(A, SA), simplify(B, SB).
 %nor
 simplify((not(A) and not(B)), nor(SA,SB)) :- simplify(A, SA), simplify(B, SB).
 simplify(not(not(A)), E) :- simplify(A, E).
-simplify(not((A)), not(E)) :- simplify(A, E).
+%simplify(not((A)), not(E)) :- simplify(A, E).
 
 %----- Seção esquisita
-simplify(xnor(A,B), xnor(SA,SB)) :- simplify(A, SA), simplify(B, SB) .% 3º hora mexendo nesse código... nada mais me impressiona
-simplify(xor(A,B), xor(SA,SB)) :- simplify(A, SA), simplify(B, SB).
-simplify(nand(A,B), nand(SA,SB)) :- simplify(A, SA), simplify(B, SB).
-simplify(nor(A,B), nor(SA,SB)) :- simplify(A, SA), simplify(B, SB).
-simplify(A and B, SA and SB) :- simplify(A, SA), simplify(B, SB).
-simplify(A or B, SA or SB) :- simplify(A, SA), simplify(B, SB).
-simplify(implies(A, B), implies(SA, SB)) :- simplify(A, SA), simplify(B, SB).
-simplify(A, A) :- atom(A).
+simplify(xnor(A,B), xnor(SA,SB)) :- simplify(A, SA), simplify(B, SB),(SA \== A ; SB \== B).% 3º hora mexendo nesse código... nada mais me impressiona
+simplify(xor(A,B), xor(SA,SB)) :- simplify(A, SA), simplify(B, SB),(SA \== A ; SB \== B).
+simplify(nand(A,B), nand(SA,SB)) :- simplify(A, SA), simplify(B, SB),(SA \== A ; SB \== B).
+simplify(nor(A,B), nor(SA,SB)) :- simplify(A, SA), simplify(B, SB),(SA \== A ; SB \== B).
+simplify(A and B, SA and SB) :- simplify(A, SA), simplify(B, SB),(SA \== A ; SB \== B).
+simplify(A or B, SA or SB) :- simplify(A, SA), simplify(B, SB),(SA \== A ; SB \== B).
+simplify(implies(A, B), implies(SA, SB)) :- simplify(A, SA), simplify(B, SB), (SA \== A ; SB \== B).
+simplify(A, A).
 
 simplify_step(A, E) :-
-    simplify_step_iterative(A, E, 10). %roda mais 10x só pra garantir
+    ( simplify_step_iterative(A, E, 10) -> true ; E = A ). %roda mais 10x só pra garantir
 simplify_step_iterative(A, E, 0) :-
-    simplify(A, E).  
+    ( simplify(A, E) -> true ; E = A ).
 simplify_step_iterative(A, E, N) :-
     N > 0,
     simplify(A, T),
